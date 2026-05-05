@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Weather Streaming</title>
+
+    <style>
+        body {
+            font-family: Arial;
+            background: #0f172a;
+            color: white;
+            text-align: center;
+        }
+
+        #container {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+            gap: 10px;
+            padding: 20px;
+        }
+
+        .card {
+            background: #1e293b;
+            padding: 10px;
+            border-radius: 10px;
+            animation: fadeIn 0.3s ease-in;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .progress-container {
+            margin: 20px auto;
+            width: 80%;
+            text-align: left;
+        }
+
+        .progress-label {
+            font-size: 14px;
+            margin-bottom: 4px;
+        }
+
+        .progress-bar {
+            width: 100%;
+            background-color: #334155;
+            border-radius: 10px;
+            overflow: hidden;
+            height: 20px;
+            margin-bottom: 15px;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background-color: #3b82f6;
+            width: 0%;
+            transition: width 0.2s;
+        }
+
+        #startBtn {
+            padding: 10px 20px;
+            margin: 20px;
+            cursor: pointer;
+            border: none;
+            border-radius: 5px;
+            background-color: #3b82f6;
+            color: white;
+            font-weight: bold;
+        }
+    </style>
+</head>
+
+<body>
+
+<h1>🌤️ Weather Streaming</h1>
+
+<button id="startBtn">Start Streaming</button>
+
+<div class="progress-container">
+    <div class="progress-label">Progress</div>
+    <div class="progress-bar"><div id="progressFill" class="progress-fill"></div></div>
+
+    <div class="progress-label">Average Temperature (°C)</div>
+    <div class="progress-bar"><div id="tempFill" class="progress-fill"></div></div>
+
+    <div class="progress-label">Average Humidity (%)</div>
+    <div class="progress-bar"><div id="humidityFill" class="progress-fill"></div></div>
+
+    <div class="progress-label">Average Wind (km/h)</div>
+    <div class="progress-bar"><div id="windFill" class="progress-fill"></div></div>
+</div>
+
+<div id="container"></div>
+
+<script>
+    const container = document.getElementById("container");
+    const progressFill = document.getElementById("progressFill");
+    const tempFill = document.getElementById("tempFill");
+    const humidityFill = document.getElementById("humidityFill");
+    const windFill = document.getElementById("windFill");
+    const startBtn = document.getElementById("startBtn");
+
+    startBtn.onclick = () => loadWeather();
+
+    function loadWeather() {
+        container.innerHTML = "";
+        progressFill.style.width = "0%";
+        tempFill.style.width = "0%";
+        humidityFill.style.width = "0%";
+        windFill.style.width = "0%";
+
+        const eventSource = new EventSource("/api/cities/stream");
+
+        eventSource.onmessage = function(event) {
+            const data = JSON.parse(event.data);
+
+            addCityCard(data.cityResource);
+
+            // mettre à jour les barres
+            progressFill.style.width = `${data.count}%`;
+
+            // Temp → on suppose max 40°C pour le pourcentage
+            tempFill.style.width = `${Math.min((data.averageWeather.temp + 10) / 50 * 100, 100)}%`;
+
+            // Humidity → % directement
+            humidityFill.style.width = `${data.averageWeather.humidity}%`;
+
+            // Wind → max 20 km/h pour le pourcentage
+            windFill.style.width = `${Math.min(data.averageWeather.wind / 20 * 100, 100)}%`;
+        };
+
+        eventSource.onerror = function(err) {
+            console.error("Stream error", err);
+            eventSource.close();
+        };
+    }
+
+    function addCityCard(cityResource) {
+        const div = document.createElement("div");
+        div.className = "card";
+
+        div.innerHTML = `
+            <h3>${cityResource.info.name}</h3>
+            <p>📍 ${cityResource.info.zipcode}</p>
+            <p>🌡️ Temp: ${cityResource.weather.temp.toFixed(1)}°C</p>
+            <p>💧 Humidity: ${cityResource.weather.humidity.toFixed(1)}%</p>
+            <p>🌬️ Wind: ${cityResource.weather.wind.toFixed(1)} km/h</p>
+        `;
+
+        container.appendChild(div);
+    }
+</script>
+
+</body>
+</html>
